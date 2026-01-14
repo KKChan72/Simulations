@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Temperature Fan Simulation</title>
+    <!-- Load Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Define the spinning animation */
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        
+        /* Animation for moving dash (current flow) */
+        @keyframes dash {
+            from {
+                stroke-dashoffset: 100;
+            }
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        /* Class to apply the spinning animation */
+        .spinning {
+            animation: spin 1s linear infinite;
+        }
+
+        /* Use the Inter font */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Custom transition for the mercury height */
+        #mercury {
+            transition: height 0.1s linear;
+        }
+
+        /* Simple CSS for the hair dryer icon */
+        .hair-dryer-body {
+            width: 6rem; /* 96px */
+            height: 4rem; /* 64px */
+            background-color: #60a5fa; /* blue-400 */
+            border-radius: 9999px 0.5rem 0.5rem 9999px; /* rounded-full rounded-r-lg */
+            margin-left: -1.5rem; /* -ml-6 */
+            position: relative;
+            z-index: 5;
+        }
+        .hair-dryer-handle {
+            width: 2rem; /* 32px */
+            height: 4rem; /* 64px */
+            background-color: #60a5fa; /* blue-400 */
+            border-radius: 0.5rem; /* rounded-lg */
+            transform: rotate(15deg);
+            position: relative;
+            z-index: 1;
+            margin-top: -1rem; /* -mt-4 */
+            margin-left: 1.5rem; /* ml-6 */
+        }
+        /* Class for when the hair dryer is on */
+        .hair-dryer-on .hair-dryer-body,
+        .hair-dryer-on .hair-dryer-handle {
+            background-color: #ef4444; /* red-500 */
+        }
+
+        /* --- Circuit Diagram Styles --- */
+        .circuit-wire {
+            stroke: #9ca3af; /* gray-400 */
+            stroke-width: 2;
+            fill: none;
+        }
+        /* 5V Wire (Black) */
+        .circuit-wire-red {
+            stroke: #1f2937; /* gray-800 (Black) */
+            stroke-width: 2;
+            fill: none;
+        }
+        /* Motor Output wires (Dark) */
+        .circuit-wire-dark {
+            stroke: #1f2937; /* gray-800 */
+            stroke-width: 2;
+            fill: none;
+        }
+
+        .circuit-component {
+            stroke: #1f2937; /* gray-800 */
+            stroke-width: 2;
+            fill: #fff;
+        }
+        
+        /* Thicker stroke for Motor to match image */
+        .circuit-component-thick {
+            stroke: #1f2937; /* gray-800 */
+            stroke-width: 3; 
+            fill: #fff;
+        }
+
+        .circuit-symbol-line {
+            stroke: #1f2937; /* gray-800 */
+            stroke-width: 2;
+            fill: none;
+        }
+        .circuit-label {
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            fill: #374151; /* gray-700 */
+        }
+        .circuit-label-dynamic {
+            font-size: 14px;
+            font-weight: 600;
+            fill: #2563eb; /* blue-600 */
+        }
+        .current-flow {
+            stroke: #ef4444; /* red-500 */
+            /* Width removed from here to allow specific sizing */
+            stroke-dasharray: 8 4; /* 8px line, 4px gap */
+            animation: dash 1s linear infinite;
+            fill: none;
+            transition: opacity 0.3s;
+        }
+        
+        /* New classes for specific current thicknesses */
+        .current-base {
+            stroke-width: 2; /* Thinner for base current */
+        }
+        
+        .current-main {
+            stroke-width: 6; /* Thicker for collector-emitter current */
+        }
+
+        /* Active state for transistor symbol (lines only) */
+        .transistor-active line, 
+        .transistor-active path {
+            stroke: #ef4444 !important; /* Red-500 */
+        }
+        .transistor-active polygon {
+            fill: #ef4444 !important; /* Red-500 */
+        }
+        /* Text rule removed so Q1 stays black */
+
+        /* Active state for Motor symbol */
+        .motor-active circle {
+            stroke: #ef4444 !important; /* Red-500 */
+        }
+        .motor-active text {
+            fill: #ef4444 !important; /* Red-500 */
+        }
+
+        .hidden {
+            opacity: 0;
+        }
+        
+        /* Slider styling */
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #4b5563;
+            cursor: pointer;
+        }
+    </style>
+    <!-- Load Inter font from Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+
+    <!-- Main simulation card: Widened to max-w-7xl for better side-by-side -->
+    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-7xl text-center">
+        
+        <h1 class="text-2xl font-bold text-gray-800 mb-6">Temperature-Controlled Fan Simulation</h1>
+
+        <!-- Grid layout: 1 Row, 2 Columns (Forced Horizontal) -->
+        <div class="grid grid-cols-2 gap-10 items-start">
+            
+            <!-- COLUMN 1: Fan, Controls, Sliders (COMPACTED) -->
+            <div class="flex flex-col space-y-3">
+                <!-- Visual representation of the fan (Smaller) -->
+                <div class="w-40 h-40 bg-gray-300 rounded-full mx-auto flex items-center justify-center border-8 border-gray-400 overflow-hidden shadow-inner">
+                    <!-- The spinning blades (Smaller) -->
+                    <div id="blades" class="w-32 h-32 relative flex items-center justify-center">
+                        <!-- Blade 1 (Horizontal) -->
+                        <div class="absolute w-full h-8 bg-gray-600 rounded-lg"></div>
+                        <!-- Blade 2 (Vertical) -->
+                        <div class="absolute w-8 h-full bg-gray-600 rounded-lg"></div>
+                        <!-- Center Hub -->
+                        <div class="absolute w-10 h-10 bg-gray-800 rounded-full z-10 shadow-lg"></div>
+                    </div>
+                </div>
+
+                <!-- Fan Status Display (Smaller Margin) -->
+                <p id="fan-status" class="text-2xl font-semibold transition-colors duration-300 mb-2">
+                    FAN IS OFF
+                </p>
+
+                <!-- Simulation Area: Hair Dryer, Sensor, & Thermistor (Smaller Margin) -->
+                <div class="flex items-end justify-around w-full h-auto mb-2">
+                    
+                    <!-- Hair Dryer (Control) -->
+                    <div id="hair-dryer" class="text-center cursor-pointer p-4 rounded-lg hover:bg-gray-100 transition relative">
+                        <div class="relative w-24 h-24 flex items-center justify-center">
+                            <div class="hair-dryer-body"></div>
+                            <div class="hair-dryer-handle"></div>
+                        </div>
+                        <p id="hair-dryer-status" class="text-sm font-medium text-gray-700 mt-2">
+                            Click to turn ON
+                        </p>
+                    </div>
+
+                    <!-- Temperature Sensor (Visual) -->
+                    <div class="text-center">
+                        <p id="temp-display" class="text-4xl font-bold text-red-500 mb-2">
+                            24°C
+                        </p>
+                        <div class="w-10 h-32 bg-gray-200 rounded-full mx-auto border-2 border-gray-400 relative overflow-hidden shadow-inner">
+                            <!-- Mercury -->
+                            <div id="mercury" class="absolute bottom-0 left-0 w-full bg-red-500" style="height: 0%;"></div>
+                            <!-- Bulb -->
+                            <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-12 bg-red-500 rounded-full border-2 border-gray-400"></div>
+                        </div>
+                        <p class="text-sm font-medium text-gray-700 mt-2">Sensor</p>
+                    </div>
+
+                    <!-- NTC Thermistor (Display) -->
+                    <div class="text-center">
+                        <p id="resistance-display" class="text-4xl font-bold text-purple-600 mb-2">
+                            -- k&Omega;
+                        </p>
+                        <div class="w-20 h-20 bg-purple-100 rounded-lg mx-auto border-2 border-purple-300 relative overflow-hidden shadow-inner flex items-center justify-center">
+                             <span class="text-4xl font-bold text-purple-700">&Omega;</span>
+                        </div>
+                        <p class="text-sm font-medium text-gray-700 mt-2">NTC R</p>
+                    </div>
+
+                </div>
+
+                <!-- Variable Resistor Control (Compact Padding) -->
+                <div class="p-2 bg-gray-50 rounded-lg border border-gray-200">
+                    <label for="vr-slider" class="block text-sm font-medium text-gray-700 mb-2">
+                        Sensitivity Adjustment (Variable Resistor VR1)
+                    </label>
+                    <div class="flex items-center space-x-4">
+                        <span class="text-sm text-gray-500">0&Omega;</span>
+                        <input 
+                            id="vr-slider" 
+                            type="range" 
+                            min="0" 
+                            max="10000" 
+                            value="5000" 
+                            class="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer"
+                        >
+                        <span class="text-sm text-gray-500">10k&Omega;</span>
+                    </div>
+                    <div class="text-center mt-2 font-mono font-bold text-blue-600" id="vr-display">
+                        5.0 k&Omega;
+                    </div>
+                </div>
+
+                <!-- Room Temperature Control (Compact Padding) -->
+                <div class="p-2 bg-orange-50 rounded-lg border border-orange-200">
+                    <label for="room-temp-slider" class="block text-sm font-medium text-gray-700 mb-2">
+                        Room Temperature (Ambient)
+                    </label>
+                    <div class="flex items-center space-x-4">
+                        <span class="text-sm text-gray-500">18°C</span>
+                        <input 
+                            id="room-temp-slider" 
+                            type="range" 
+                            min="18" 
+                            max="36" 
+                            value="24" 
+                            class="w-full h-2 bg-orange-300 rounded-lg appearance-none cursor-pointer"
+                        >
+                        <span class="text-sm text-gray-500">36°C</span>
+                    </div>
+                    <div class="text-center mt-2 font-mono font-bold text-orange-600" id="room-temp-display">
+                        24°C
+                    </div>
+                </div>
+                
+                <!-- Threshold Information -->
+                <p id="threshold-display" class="text-sm text-gray-500 mt-2">
+                    <!-- This will be set by JavaScript -->
+                </p>
+            </div>
+
+            <!-- COLUMN 2: Circuit Diagram -->
+            <div class="flex flex-col justify-center p-4 bg-gray-50 rounded-xl border border-gray-200 h-full">
+                <h2 class="text-xl font-semibold text-gray-700 mb-4">Circuit Diagram</h2>
+                <svg viewBox="0 0 350 250" class="w-full h-auto">
+                <!-- Wires -->
+                <path class="circuit-wire-red" d="M50 30 H300" /> <!-- VCC Rail (Black) -->
+                <path class="circuit-wire" d="M50 220 H300" /> <!-- GND Rail -->
+                
+                <path class="circuit-wire-red" d="M100 30 V70" /> <!-- To NTC (Black) -->
+                <path class="circuit-wire" d="M100 130 V170" /> <!-- From NTC to VR1 -->
+                
+                <!-- NEW: V_base tap from midpoint (y=150) with a jog to Base (y=130) -->
+                <path class="circuit-wire" d="M100 150 H140 V130 H170" />
+                <!-- Junction Dot -->
+                <circle cx="100" cy="150" r="3" fill="#374151" />
+
+                <path class="circuit-wire" d="M100 220 V210" /> <!-- From VR1 to GND -->
+
+                <!-- Wire to Motor (Top) -->
+                <!-- Wire from Emitter to GND is handled in Transistor section -->
+                <path class="circuit-wire" d="M230 160 V220" /> <!-- From Emitter Node to GND -->
+
+                <!-- Animated Current Paths (hidden by default) -->
+                <!-- Updated path to follow the new wire routing -->
+                <path id="current-path-base" class="current-flow current-base hidden" d="M100 150 H140 V130 H190" />
+                
+                <!-- Updated Collector Current Path: Starts at y=30 (5V Rail) instead of y=20 -->
+                <path id="current-path-collector" class="current-flow current-main hidden" d="M230 30 V100 L190 120 M190 140 L230 160 V220" />
+
+
+                <!-- Components -->
+                
+                <!-- NTC Thermistor (Specific Symbol from Image) -->
+                <!-- Body -->
+                <rect class="circuit-component" x="85" y="70" width="30" height="60" />
+                <!-- Symbol: Vertical foot at top-left, then diagonal down-right through box -->
+                <path class="circuit-symbol-line" d="M75 55 V75 L125 145" />
+                
+                <!-- Text -->
+                <text class="circuit-label" x="80" y="45" text-anchor="end">R_ntc</text>
+                <text class="circuit-label" x="130" y="100" text-anchor="start" font-style="italic">-t°</text>
+
+                <!-- Variable Resistor VR1 -->
+                <!-- Body -->
+                <rect class="circuit-component" x="85" y="170" width="30" height="40" />
+                <!-- Diagonal Arrow -->
+                <path class="circuit-symbol-line" d="M75 220 L125 160" /> <!-- Arrow Shaft -->
+                <path class="circuit-symbol-line" d="M125 160 L115 165 M125 160 L123 170" /> <!-- Arrow Head (Rough) -->
+                <!-- Text -->
+                <text class="circuit-label" x="80" y="185" text-anchor="end">VR1</text>
+                <text id="circuit-vr-value" class="circuit-label-dynamic" x="125" y="195" text-anchor="start">5.0 k&Omega;</text>
+
+                <!-- Transistor (Q1) - Updated Symbol from Image -->
+                <g id="transistor-symbol">
+                    <!-- Base Connection (Horizontal) -->
+                    <line class="circuit-component" x1="170" y1="130" x2="190" y2="130" />
+                    
+                    <!-- Base Bar (Vertical) -->
+                    <line class="circuit-component" x1="190" y1="110" x2="190" y2="150" stroke-width="3" />
+                    
+                    <!-- Collector Leg (Diagonal) - Shifted DOWN to y=120 -->
+                    <path class="circuit-component" d="M190 120 L230 100" />
+                    
+                    <!-- Emitter Leg (Diagonal then Vertical) - Shifted DOWN to y=140 -->
+                    <path class="circuit-component" d="M190 140 L230 160" />
+                    
+                    <!-- Emitter Arrow (Filled Symmetrical Triangle) - Adjusted for new position -->
+                    <polygon points="228,159 220,150 216,158" fill="#1f2937" stroke="none" />
+                    
+                    <!-- Label -->
+                    <text class="circuit-label" x="240" y="125" text-anchor="start">Q1</text>
+                </g>
+                
+                <!-- Motor (M) -->
+                <!-- Wire from 5V (Was Red, Now Black via CSS) -->
+                <path class="circuit-wire-red" d="M230 30 V50" /> 
+                
+                <!-- Wrapped Motor components in a group for easy targeting -->
+                <g id="motor-symbol">
+                    <!-- Thicker Circle to match image -->
+                    <circle class="circuit-component-thick" cx="230" cy="70" r="20" />
+                    <text class="circuit-label" x="230" y="75" text-anchor="middle" font-size="20">M</text>
+                </g>
+
+                <!-- Wire to Collector (Dark/Black) -->
+                <path class="circuit-wire-dark" d="M230 90 V100" /> 
+                
+                <text class="circuit-label" x="255" y="55" text-anchor="start">Fan</text>
+
+                <!-- Labels -->
+                <text class="circuit-label" x="45" y="35" text-anchor="end">5V</text>
+                <text class="circuit-label" x="45" y="225" text-anchor="end">GND</text>
+                
+                <!-- Dynamic V_base Label -->
+                <text class="circuit-label" x="185" y="125" text-anchor="end">V_base:</text>
+                <text id="v-base-text" class="circuit-label-dynamic" x="185" " y="145" text-anchor="end">0.00 V</text>
+            </svg>
+        </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const MIN_TEMP = 5; 
+        const MAX_TEMP = 50;
+        // const ROOM_TEMP = 24; // Removed fixed constant, now dynamic
+        
+        // 1 degree every 3 seconds
+        const HEAT_RATE = 0.033; 
+        const COOL_RATE = 0.033; 
+        
+        const UPDATE_INTERVAL = 100; // Milliseconds
+
+        // --- CIRCUIT PARAMETERS ---
+        const VCC = 5.0; // Volts
+        const V_ON = 0.7; // Transistor Base-Emitter On Voltage
+
+        // NTC CALIBRATION POINTS (Exponential Model)
+        // R1 = 50k at 20°C
+        // R2 = 15k at 35°C
+        const T1_REF = 20 + 273.15; // Kelvin
+        const R1_REF = 50000;       // Ohms
+        const T2_REF = 35 + 273.15; // Kelvin
+        const R2_REF = 15000;       // Ohms
+
+        // Calculate Beta Coefficient for the NTC equation
+        const BETA = Math.log(R1_REF / R2_REF) / ((1 / T1_REF) - (1 / T2_REF));
+
+        // --- STATE ---
+        let currentTemp = 24; // Start at default room temp
+        let isHairDryerOn = false;
+        let r_ntc = 0;
+        let r_var = 5000; 
+        let v_base = 0;
+
+        // --- GET ELEMENTS FROM THE DOM ---
+        const tempDisplay = document.getElementById('temp-display');
+        const fanStatus = document.getElementById('fan-status');
+        const blades = document.getElementById('blades');
+        const thresholdDisplay = document.getElementById('threshold-display');
+        const hairDryerElement = document.getElementById('hair-dryer');
+        const hairDryerStatus = document.getElementById('hair-dryer-status');
+        const mercuryElement = document.getElementById('mercury');
+        const resistanceDisplay = document.getElementById('resistance-display');
+        
+        // Slider & Controls
+        const vrSlider = document.getElementById('vr-slider');
+        const vrDisplay = document.getElementById('vr-display');
+        const circuitVrValue = document.getElementById('circuit-vr-value');
+        
+        // New Room Temp Slider
+        const roomTempSlider = document.getElementById('room-temp-slider');
+        const roomTempDisplay = document.getElementById('room-temp-display');
+
+        // Circuit Diagram Elements
+        const vBaseText = document.getElementById('v-base-text');
+        const currentBasePath = document.getElementById('current-path-base');
+        const currentCollectorPath = document.getElementById('current-path-collector');
+
+        // --- CORE LOGIC FUNCTIONS ---
+
+        function updateFanState(v_base) {
+            const transistorGroup = document.getElementById('transistor-symbol');
+            const motorGroup = document.getElementById('motor-symbol');
+
+            if (v_base >= V_ON) {
+                // --- STATE: ON ---
+                blades.classList.add('spinning');
+                fanStatus.textContent = 'FAN IS ON';
+                fanStatus.classList.remove('text-red-600');
+                fanStatus.classList.add('text-green-600');
+                
+                // Show current flow
+                currentBasePath.classList.remove('hidden');
+                currentCollectorPath.classList.remove('hidden');
+
+                // Turn transistor symbol RED (lines/arrows only)
+                transistorGroup.classList.add('transistor-active');
+                // Turn Motor symbol RED
+                motorGroup.classList.add('motor-active');
+
+            } else {
+                // --- STATE: OFF ---
+                blades.classList.remove('spinning');
+                fanStatus.textContent = 'FAN IS OFF';
+                fanStatus.classList.remove('text-green-600');
+                fanStatus.classList.add('text-red-600');
+
+                // Hide current flow
+                currentBasePath.classList.add('hidden');
+                currentCollectorPath.classList.add('hidden');
+
+                // Revert symbols to default
+                transistorGroup.classList.remove('transistor-active');
+                motorGroup.classList.remove('motor-active');
+            }
+        }
+
+        function updateTemperatureDisplay(temp) {
+            // Update text
+            tempDisplay.textContent = `${Math.round(temp)}°C`;
+
+            // Update thermometer
+            const tempPercentage = (temp - MIN_TEMP) / (MAX_TEMP - MIN_TEMP) * 100;
+            mercuryElement.style.height = `${Math.max(0, Math.min(100, tempPercentage))}%`;
+        }
+
+        /**
+         * Calculates NTC resistance based on temperature using the Beta equation.
+         * R = R0 * e^(Beta * (1/T - 1/T0))
+         */
+        function calculateNTCResistance(tempCelcius) {
+            const tempKelvin = tempCelcius + 273.15;
+            
+            // Using T1_REF (20°C) as the base point
+            const resistance = R1_REF * Math.exp(BETA * ((1 / tempKelvin) - (1 / T1_REF)));
+            
+            return resistance;
+        }
+
+        function updateResistanceDisplay(resistance) {
+            // Format for display in kOhms
+            const displayValue = (resistance / 1000).toFixed(1);
+            resistanceDisplay.textContent = `${displayValue} k\u2126`; // \u2126 is the Ohm symbol
+        }
+
+        function toggleHairDryer() {
+            isHairDryerOn = !isHairDryerOn;
+
+            if (isHairDryerOn) {
+                hairDryerElement.classList.add('hair-dryer-on');
+                hairDryerElement.classList.add('animate-pulse');
+                hairDryerStatus.textContent = 'Heating... (Click to stop)';
+            } else {
+                hairDryerElement.classList.remove('hair-dryer-on');
+                hairDryerElement.classList.remove('animate-pulse');
+                hairDryerStatus.textContent = 'Click to turn ON';
+            }
+        }
+
+        function updateCircuitDisplay(v_base) {
+            vBaseText.textContent = `${v_base.toFixed(2)} V`;
+            
+            const kOhm = (r_var / 1000).toFixed(1);
+            circuitVrValue.textContent = `${kOhm} k\u2126`;
+            vrDisplay.textContent = `${kOhm} k\u2126`;
+            
+            // Update Room Temp Display
+            roomTempDisplay.textContent = `${roomTempSlider.value}°C`;
+        }
+
+        function simulationLoop() {
+            // 1. Get Variable Resistor & Room Temp values
+            r_var = parseInt(vrSlider.value);
+            const targetRoomTemp = parseInt(roomTempSlider.value);
+
+            // 2. Adjust temperature
+            if (isHairDryerOn) {
+                currentTemp += HEAT_RATE;
+            } else {
+                // Move towards Room Temperature (Cool down or Warm up)
+                if (currentTemp > targetRoomTemp) {
+                    currentTemp -= COOL_RATE;
+                    // Snap to room temp if we get very close
+                    if (currentTemp < targetRoomTemp) currentTemp = targetRoomTemp;
+                } else if (currentTemp < targetRoomTemp) {
+                    currentTemp += COOL_RATE; // Use same rate for ambient warming
+                    if (currentTemp > targetRoomTemp) currentTemp = targetRoomTemp;
+                }
+            }
+            
+            // Clamp temperature 
+            currentTemp = Math.min(MAX_TEMP, currentTemp);
+
+            // 3. Calculate circuit values
+            r_ntc = calculateNTCResistance(currentTemp);
+            
+            // Voltage divider: V_base = VCC * R_VAR / (R_ntc + R_VAR)
+            v_base = VCC * r_var / (r_ntc + r_var);
+
+            // 4. Update all visuals
+            updateTemperatureDisplay(currentTemp);
+            updateResistanceDisplay(r_ntc);
+            updateCircuitDisplay(v_base);
+            updateFanState(v_base);
+        }
+
+        // --- INITIALIZATION ---
+
+        thresholdDisplay.textContent = `Transistor Q1 turns ON when V_base \u2265 ${V_ON}V`;
+
+        hairDryerElement.addEventListener('click', toggleHairDryer);
+
+        simulationLoop();
+        setInterval(simulationLoop, UPDATE_INTERVAL);
+
+    </script>
+</body>
+</html>

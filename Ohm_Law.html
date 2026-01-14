@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ohm's Law: The Battery Simulation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #f0f9ff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow-x: hidden;
+            /* Prevent bounce scrolling on mobile */
+            overscroll-behavior: none; 
+        }
+        canvas {
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            width: 100%; /* Make canvas responsive */
+            max-width: 600px; /* Cap width */
+            /* Sharp rendering on high DPI mobile screens */
+            image-rendering: -webkit-optimize-contrast;
+        }
+        .control-panel {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        /* Custom Slider Styling - MOBILE OPTIMIZED */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+            padding: 10px 0; /* Increase touch target area */
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 28px; /* Larger thumb for touch */
+            width: 28px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            margin-top: -10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 8px; /* Thicker track */
+            cursor: pointer;
+            background: #e2e8f0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="p-2 flex flex-col items-center min-h-screen">
+
+    <!-- Header -->
+    <div class="text-center mb-2 max-w-2xl px-2">
+        <h1 class="text-xl font-bold text-slate-800 mb-0">Ohm's Law Visualizer</h1>
+        <p class="text-slate-600 text-xs mt-1">
+            See how <span class="font-bold text-amber-600">Voltage</span> and 
+            <span class="font-bold text-slate-600">Resistance</span> affect 
+            <span class="font-bold text-red-600">Current</span>.
+        </p>
+    </div>
+
+    <!-- Main Container -->
+    <div class="w-full max-w-xl flex flex-col gap-3 items-center">
+        
+        <!-- Canvas Area -->
+        <div class="flex-grow w-full flex justify-center bg-slate-100 p-1 rounded-xl border-2 border-slate-200">
+            <canvas id="simCanvas"></canvas>
+        </div>
+
+        <!-- Controls Panel -->
+        <div class="control-panel w-full p-4 flex flex-col gap-3 h-fit">
+            
+            <!-- Voltage Control -->
+            <div>
+                <div class="flex justify-between items-center mb-1">
+                    <label class="font-bold text-amber-600 flex items-center gap-2 text-sm">
+                        <span>⚡ Voltage (V)</span>
+                    </label>
+                    <span id="voltsDisplay" class="bg-amber-100 text-amber-800 px-3 py-1 rounded font-mono font-bold text-sm">10 V</span>
+                </div>
+                <input type="range" id="voltageSlider" min="1" max="20" value="10" step="0.5">
+            </div>
+
+            <!-- Resistance Control -->
+            <div>
+                <div class="flex justify-between items-center mb-1">
+                    <label class="font-bold text-slate-700 flex items-center gap-2 text-sm">
+                        <span>🛑 Resistance (R)</span>
+                    </label>
+                    <span id="ohmsDisplay" class="bg-slate-200 text-slate-800 px-3 py-1 rounded font-mono font-bold text-sm">50 &Omega;</span>
+                </div>
+                <input type="range" id="resistanceSlider" min="1" max="100" value="50" step="1">
+            </div>
+
+            <!-- Legend -->
+            <div class="bg-blue-50 p-2 rounded-lg text-xs text-blue-800 mt-1 flex flex-wrap gap-x-4 gap-y-1 justify-center">
+                <div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full bg-red-500"></div> 🔴 <strong>Current</strong></div>
+                <div class="flex items-center gap-2">⚡ <strong>Voltage</strong></div>
+                <div class="flex items-center gap-2">⬛ <strong>Resistance</strong></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // UI Elements
+        const voltageSlider = document.getElementById('voltageSlider');
+        const resistanceSlider = document.getElementById('resistanceSlider');
+        const voltsDisplay = document.getElementById('voltsDisplay');
+        const ohmsDisplay = document.getElementById('ohmsDisplay');
+
+        // State
+        let voltage = 10;
+        let resistance = 50;
+        let current = 0; 
+        let currentFormattedText = "";
+        let particles = [];
+        let spawnAccumulator = 0; 
+        
+        // Simulation Constants
+        const CANVAS_WIDTH = 600;
+        const CANVAS_HEIGHT = 240; 
+        const PIPE_START_X = 150;
+        const BASE_PIPE_HEIGHT = 180;
+        const MIN_PIPE_HEIGHT = 14;   
+
+        // Set canvas resolution
+        canvas.width = CANVAS_WIDTH;
+        canvas.height = CANVAS_HEIGHT;
+
+        // --- SIMULATION LOGIC ---
+
+        function calculateValues() {
+            voltage = parseFloat(voltageSlider.value);
+            resistance = parseFloat(resistanceSlider.value);
+            
+            // I = V / R
+            current = voltage / resistance; // Amps
+
+            // Update UI
+            voltsDisplay.innerText = voltage + " V";
+            ohmsDisplay.innerText = resistance + " Ω";
+            
+            // Display current formatted nicely
+            if (current < 0.001) {
+                currentFormattedText = (current * 1000000).toFixed(1) + " µA";
+            } else if (current < 1) {
+                currentFormattedText = (current * 1000).toFixed(2) + " mA";
+            } else {
+                currentFormattedText = current.toFixed(3) + " A";
+            }
+        }
+
+        function drawBattery(ctx, x, y, sizeScale) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.scale(sizeScale, sizeScale);
+
+            // Battery Body (Dark Slate)
+            ctx.fillStyle = '#1e293b'; 
+            ctx.fillRect(-40, -40, 80, 80); 
+
+            // Battery Top (Positive Terminal - Amber)
+            ctx.fillStyle = '#f59e0b'; 
+            ctx.beginPath();
+            ctx.moveTo(40, -20);
+            ctx.lineTo(50, -20);
+            ctx.lineTo(50, 20);
+            ctx.lineTo(40, 20);
+            ctx.fill();
+
+            // Decorative Stripe
+            ctx.fillStyle = '#f59e0b'; 
+            ctx.fillRect(25, -40, 15, 80);
+
+            // Lightning Bolt Icon
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.moveTo(-5, -12);
+            ctx.lineTo(10, -4);
+            ctx.lineTo(0, 4);
+            ctx.lineTo(5, 16);
+            ctx.lineTo(-15, 4);
+            ctx.lineTo(-5, -4);
+            ctx.closePath();
+            ctx.fill();
+
+            // + Sign
+            ctx.fillStyle = '#78350f';
+            ctx.font = 'bold 20px monospace';
+            ctx.fillText("+", 55, 5);
+
+            ctx.restore();
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // --- 1. Geometry Calculation ---
+            const rMin = 1;
+            const rMax = 100;
+            const hMax = BASE_PIPE_HEIGHT;
+            const hMin = MIN_PIPE_HEIGHT;
+            
+            const rNorm = (resistance - rMin) / (rMax - rMin);
+            const currentPipeHeight = hMax - (rNorm * (hMax - hMin));
+            const yCenter = CANVAS_HEIGHT / 2;
+            const halfHeight = currentPipeHeight / 2;
+
+            // Increased ball radius for better visibility on small screens
+            const ballRadius = 10; 
+
+            // --- 2. Draw Pipe Background (Inside) ---
+            ctx.fillStyle = '#e2e8f0'; 
+            ctx.fillRect(PIPE_START_X, yCenter - halfHeight, CANVAS_WIDTH - PIPE_START_X, currentPipeHeight);
+
+            // --- 3. Update & Draw Current (Balls) ---
+            
+            const speedMultiplier = 12.0; 
+            let speed = current * speedMultiplier; 
+            if (speed > 100) speed = 100; 
+
+            const spawnMultiplier = 5.0; 
+            spawnAccumulator += current * spawnMultiplier;
+
+            // Collision Check Function
+            const checkCollision = (y) => {
+                 const minDistance = ballRadius * 2.1; 
+                 for (let i = particles.length - 1; i >= 0; i--) {
+                     let p = particles[i];
+                     if (p.x - PIPE_START_X > minDistance * 2) break; 
+                     
+                     let dx = p.x - PIPE_START_X;
+                     let dy = p.y - y;
+                     let distSq = dx*dx + dy*dy;
+                     if (distSq < minDistance * minDistance) return true; // Overlap
+                 }
+                 return false;
+            };
+
+            while (spawnAccumulator >= 1) {
+                spawnAccumulator -= 1;
+                
+                const safeZone = (currentPipeHeight / 2) - ballRadius;
+                
+                // Try multiple times to find a non-overlapping spot
+                let spawned = false;
+                const maxAttempts = 15; 
+                
+                for(let attempt = 0; attempt < maxAttempts; attempt++) {
+                    const randomYOffset = (Math.random() * 2 - 1) * safeZone;
+                    const candidateY = yCenter + randomYOffset;
+                    
+                    if (!checkCollision(candidateY)) {
+                        particles.push({
+                            x: PIPE_START_X, 
+                            y: candidateY
+                        });
+                        spawned = true;
+                        break;
+                    }
+                }
+            }
+
+            // Draw Particles
+            ctx.fillStyle = '#ef4444'; 
+            ctx.strokeStyle = '#7f1d1d'; 
+
+            for (let i = 0; i < particles.length; i++) {
+                let p = particles[i];
+                p.x += speed;
+                
+                // Constraint Logic
+                const limit = (currentPipeHeight / 2) - ballRadius;
+                if (p.y > yCenter + limit) p.y = yCenter + limit;
+                if (p.y < yCenter - limit) p.y = yCenter - limit;
+
+                // Draw Body
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, ballRadius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                
+                // Draw Shine
+                ctx.beginPath();
+                ctx.arc(p.x - ballRadius*0.3, p.y - ballRadius*0.3, ballRadius/3, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255,255,255,0.4)';
+                ctx.fill();
+                ctx.fillStyle = '#ef4444'; 
+            }
+
+            // Remove off-screen particles
+            particles = particles.filter(p => p.x < CANVAS_WIDTH + ballRadius);
+
+            // --- 4. Draw Pipe Walls (Covers) ---
+            ctx.fillStyle = '#475569'; 
+            ctx.fillRect(PIPE_START_X, 0, CANVAS_WIDTH - PIPE_START_X, yCenter - halfHeight);
+            ctx.fillRect(PIPE_START_X, yCenter + halfHeight, CANVAS_WIDTH - PIPE_START_X, CANVAS_HEIGHT - (yCenter + halfHeight));
+            
+            // Pipe Outline - Thicker for mobile
+            ctx.beginPath();
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 4; // Increased line width
+            ctx.moveTo(PIPE_START_X, yCenter - halfHeight);
+            ctx.lineTo(CANVAS_WIDTH, yCenter - halfHeight);
+            ctx.moveTo(PIPE_START_X, yCenter + halfHeight);
+            ctx.lineTo(CANVAS_WIDTH, yCenter + halfHeight);
+            ctx.stroke();
+
+            // RESISTANCE Label - Larger Font
+            ctx.font = 'bold 22px monospace';
+            ctx.fillStyle = 'white';
+            ctx.textAlign = 'center';
+            if (yCenter - halfHeight > 25) {
+                ctx.fillText(resistance + " Ω", (PIPE_START_X + CANVAS_WIDTH)/2, (yCenter - halfHeight)/2 + 8);
+            }
+
+            // CURRENT Label - Larger Font
+            const bottomWallTop = yCenter + halfHeight;
+            const bottomWallHeight = CANVAS_HEIGHT - bottomWallTop;
+            if (bottomWallHeight > 25) {
+                 ctx.font = 'bold 22px monospace';
+                 ctx.fillStyle = 'white';
+                 ctx.textAlign = 'center';
+                 ctx.fillText(currentFormattedText, (PIPE_START_X + CANVAS_WIDTH)/2, bottomWallTop + bottomWallHeight/2 + 8);
+            }
+
+
+            // --- 5. Draw Battery (Voltage) ---
+            const batteryScale = 0.8 + ((voltage - 1) / 19) * 1.2;
+            const batteryX = PIPE_START_X - (50 * batteryScale);
+            drawBattery(ctx, batteryX, CANVAS_HEIGHT / 2, batteryScale);
+
+            // VOLTAGE Label - Larger Font
+            ctx.fillStyle = '#d97706'; 
+            ctx.font = 'bold 22px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(voltage + " V", batteryX, (CANVAS_HEIGHT / 2) - (50 * batteryScale) - 15);
+
+            // --- 6. Flow Overlay ---
+            if (speed > 0.5 && currentPipeHeight > 40) {
+                ctx.font = "bold 24px sans-serif"; // Larger font
+                ctx.fillStyle = "rgba(0,0,0,0.15)";
+                ctx.fillText("CURRENT FLOW ➤", (PIPE_START_X + CANVAS_WIDTH)/2, yCenter);
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        // Event Listeners
+        voltageSlider.addEventListener('input', calculateValues);
+        resistanceSlider.addEventListener('input', calculateValues);
+
+        // Init
+        calculateValues();
+        animate();
+
+    </script>
+</body>
+</html>

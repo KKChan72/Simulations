@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Light Sensing Circuit_1</title>
+    <!-- Load Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Animation for moving dash (current flow) */
+        @keyframes dash {
+            from {
+                stroke-dashoffset: 100;
+            }
+            to {
+                stroke-dashoffset: 0;
+            }
+        }
+
+        /* Use the Inter font */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Circuit Diagram Styles */
+        .circuit-wire {
+            stroke: #9ca3af; /* gray-400 */
+            stroke-width: 2;
+            fill: none;
+        }
+        .circuit-wire-red {
+            stroke: #1f2937; /* gray-800 (Black) */
+            stroke-width: 2;
+            fill: none;
+        }
+        .circuit-wire-dark {
+            stroke: #1f2937; /* gray-800 */
+            stroke-width: 2;
+            fill: none;
+        }
+
+        .circuit-component {
+            stroke: #1f2937; /* gray-800 */
+            stroke-width: 2;
+            fill: #fff;
+        }
+        
+        .circuit-component-thick {
+            stroke: #1f2937; /* gray-800 */
+            stroke-width: 3; 
+            fill: #fff;
+        }
+
+        .circuit-symbol-line {
+            stroke: #1f2937; /* gray-800 */
+            stroke-width: 2;
+            fill: none;
+        }
+        .circuit-label {
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            fill: #374151; /* gray-700 */
+        }
+        .circuit-label-dynamic {
+            font-size: 14px;
+            font-weight: 600;
+            fill: #2563eb; /* blue-600 */
+        }
+        .current-flow {
+            stroke: #ef4444; /* red-500 */
+            stroke-dasharray: 8 4; /* 8px line, 4px gap */
+            animation: dash 1s linear infinite;
+            fill: none;
+            transition: opacity 0.3s;
+        }
+        
+        .current-base {
+            stroke-width: 2; 
+        }
+        
+        .current-main {
+            stroke-width: 6; 
+        }
+
+        .transistor-active line, 
+        .transistor-active path {
+            stroke: #ef4444 !important; /* Red-500 */
+        }
+        .transistor-active polygon {
+            fill: #ef4444 !important; /* Red-500 */
+        }
+
+        /* Active state for LED Circuit Symbol */
+        .led-active path, .led-active line, .led-active polygon {
+            stroke: #ef4444 !important; /* Red-500 */
+            fill: #ef4444 !important;
+        }
+
+        .hidden {
+            opacity: 0;
+        }
+        
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #4b5563;
+            cursor: pointer;
+        }
+        
+        /* Sun Glow Effect */
+        .sun-glow {
+            transition: opacity 0.2s, filter 0.2s;
+        }
+
+        /* LED Visual Styles */
+        .led-bulb {
+            background-color: #991b1b; /* Dark Red (Off) */
+            transition: background-color 0.1s, box-shadow 0.1s;
+        }
+        .led-bulb.on {
+            background-color: #ef4444; /* Bright Red (On) */
+            box-shadow: 0 0 20px 5px rgba(239, 68, 68, 0.6); /* Glow */
+        }
+    </style>
+    <!-- Load Inter font from Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+
+    <!-- Main simulation card -->
+    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-7xl text-center">
+        
+        <h1 class="text-2xl font-bold text-gray-800 mb-6">Light Sensing Circuit_1</h1>
+
+        <!-- Grid layout: 1 Row, 2 Columns -->
+        <div class="grid grid-cols-2 gap-10 items-start">
+            
+            <!-- COLUMN 1: LED, Controls, Sliders -->
+            <div class="flex flex-col space-y-3">
+                
+                <!-- Visual representation of the LED -->
+                <div class="w-40 h-40 bg-gray-300 rounded-full mx-auto flex items-center justify-center border-8 border-gray-400 overflow-hidden shadow-inner relative">
+                    <!-- LED Bulb Visual -->
+                    <div id="led-visual" class="led-bulb w-24 h-24 rounded-full border-4 border-gray-600 relative shadow-xl">
+                        <!-- Reflection/Shine -->
+                        <div class="absolute top-4 left-4 w-6 h-6 bg-white opacity-30 rounded-full"></div>
+                    </div>
+                </div>
+
+                <!-- LED Status Display -->
+                <p id="led-status" class="text-2xl font-semibold transition-colors duration-300 mb-2">
+                    LED IS OFF
+                </p>
+
+                <!-- Simulation Area: Light Sensor -->
+                <div class="flex items-end justify-around w-full h-auto mb-2">
+                    
+                    <!-- Light Sensor Visual -->
+                    <div class="text-center w-full">
+                        <p id="lux-display" class="text-4xl font-bold text-yellow-500 mb-4">
+                            0 Lux
+                        </p>
+                        
+                        <!-- Sun Icon Visual -->
+                        <div class="w-32 h-32 mx-auto relative flex items-center justify-center bg-sky-100 rounded-full border-4 border-sky-200 overflow-hidden shadow-inner">
+                            <div id="sun-body" class="w-16 h-16 bg-yellow-400 rounded-full shadow-lg relative z-10 sun-glow"></div>
+                            <svg id="sun-rays" class="absolute top-0 left-0 w-full h-full sun-glow text-yellow-400" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="4">
+                                <line x1="50" y1="10" x2="50" y2="25" />
+                                <line x1="50" y1="75" x2="50" y2="90" />
+                                <line x1="10" y1="50" x2="25" y2="50" />
+                                <line x1="75" y1="50" x2="90" y2="50" />
+                                <line x1="22" y1="22" x2="32" y2="32" />
+                                <line x1="68" y1="68" x2="78" y2="78" />
+                                <line x1="22" y1="78" x2="32" y2="68" />
+                                <line x1="68" y1="32" x2="78" y2="22" />
+                            </svg>
+                        </div>
+                        <p class="text-sm font-medium text-gray-700 mt-2">LDR Sensor</p>
+                    </div>
+
+                    <!-- LDR Resistance (Display) -->
+                    <div class="text-center w-full">
+                        <p id="resistance-display" class="text-4xl font-bold text-purple-600 mb-4">
+                            -- k&Omega;
+                        </p>
+                        <div class="w-24 h-24 bg-purple-100 rounded-lg mx-auto border-2 border-purple-300 relative overflow-hidden shadow-inner flex items-center justify-center">
+                             <span class="text-4xl font-bold text-purple-700">&Omega;</span>
+                        </div>
+                        <p class="text-sm font-medium text-gray-700 mt-2">LDR Resistance</p>
+                    </div>
+
+                </div>
+
+                <!-- Light Intensity Control -->
+                <div class="p-2 bg-yellow-50 rounded-lg border border-yellow-200">
+                    <label for="light-slider" class="block text-sm font-medium text-gray-700 mb-2">
+                        Light Intensity (Lux)
+                    </label>
+                    <div class="flex items-center space-x-4">
+                        <span class="text-sm text-gray-500">Dark (0)</span>
+                        <input 
+                            id="light-slider" 
+                            type="range" 
+                            min="0" 
+                            max="1000" 
+                            value="500" 
+                            class="w-full h-2 bg-yellow-300 rounded-lg appearance-none cursor-pointer"
+                        >
+                        <span class="text-sm text-gray-500">Bright (1000)</span>
+                    </div>
+                    <div class="text-center mt-2 font-mono font-bold text-yellow-600" id="light-slider-display">
+                        500 Lux
+                    </div>
+                </div>
+
+                <!-- Variable Resistor Control -->
+                <div class="p-2 bg-gray-50 rounded-lg border border-gray-200">
+                    <label for="vr-slider" class="block text-sm font-medium text-gray-700 mb-2">
+                        Sensitivity Adjustment (Variable Resistor VR1)
+                    </label>
+                    <div class="flex items-center space-x-4">
+                        <span class="text-sm text-gray-500">0&Omega;</span>
+                        <input 
+                            id="vr-slider" 
+                            type="range" 
+                            min="0" 
+                            max="10000" 
+                            value="5000" 
+                            class="w-full h-2 bg-gray-300 rounded-lg appearance-none cursor-pointer"
+                        >
+                        <span class="text-sm text-gray-500">10k&Omega;</span>
+                    </div>
+                    <div class="text-center mt-2 font-mono font-bold text-blue-600" id="vr-display">
+                        5.0 k&Omega;
+                    </div>
+                </div>
+                
+                <!-- Threshold Information -->
+                <p id="threshold-display" class="text-sm text-gray-500 mt-2">
+                    <!-- This will be set by JavaScript -->
+                </p>
+            </div>
+
+            <!-- COLUMN 2: Circuit Diagram -->
+            <div class="flex flex-col justify-center p-4 bg-gray-50 rounded-xl border border-gray-200 h-full">
+                <h2 class="text-xl font-semibold text-gray-700 mb-4">Circuit Diagram</h2>
+                <svg viewBox="0 0 350 250" class="w-full h-auto">
+                <!-- Wires -->
+                <path class="circuit-wire-red" d="M50 30 H300" /> <!-- VCC Rail -->
+                <path class="circuit-wire" d="M50 220 H300" /> <!-- GND Rail -->
+                
+                <path class="circuit-wire-red" d="M100 30 V70" /> <!-- To LDR -->
+                <path class="circuit-wire" d="M100 130 V170" /> <!-- From LDR to VR1 -->
+                
+                <!-- V_base tap -->
+                <path class="circuit-wire" d="M100 150 H140 V130 H170" />
+                <circle cx="100" cy="150" r="3" fill="#374151" />
+
+                <path class="circuit-wire" d="M100 220 V210" /> <!-- From VR1 to GND -->
+
+                <!-- Wire to LED -->
+                <path class="circuit-wire" d="M230 160 V220" /> <!-- From Emitter Node to GND -->
+
+                <!-- Current Paths -->
+                <path id="current-path-base" class="current-flow current-base hidden" d="M100 150 H140 V130 H190" />
+                <path id="current-path-collector" class="current-flow current-main hidden" d="M230 30 V63 H239 M239 77 H230 V100 L190 120 M190 140 L230 160 V220" />
+
+
+                <!-- Components -->
+                
+                <!-- LDR -->
+                <rect class="circuit-component" x="85" y="70" width="30" height="60" />
+                <g stroke="#1f2937" stroke-width="2" fill="none">
+                    <path d="M60 80 L80 90" marker-end="url(#arrowhead)" />
+                    <path d="M60 100 L80 110" marker-end="url(#arrowhead)" />
+                </g>
+                <defs>
+                    <marker id="arrowhead" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                        <path d="M0,0 L6,3 L0,6" fill="#1f2937" />
+                    </marker>
+                </defs>
+                <text class="circuit-label" x="80" y="45" text-anchor="end">R_ldr</text>
+                <text class="circuit-label" x="120" y="100" text-anchor="start" font-style="italic">Light</text>
+
+                <!-- Variable Resistor VR1 -->
+                <rect class="circuit-component" x="85" y="170" width="30" height="40" />
+                <path class="circuit-symbol-line" d="M75 220 L125 160" /> 
+                <path class="circuit-symbol-line" d="M125 160 L115 165 M125 160 L123 170" /> 
+                <text class="circuit-label" x="80" y="185" text-anchor="end">VR1</text>
+                <text id="circuit-vr-value" class="circuit-label-dynamic" x="125" y="195" text-anchor="start">5.0 k&Omega;</text>
+
+                <!-- Transistor (Q1) -->
+                <g id="transistor-symbol">
+                    <line class="circuit-component" x1="170" y1="130" x2="190" y2="130" />
+                    <line class="circuit-component" x1="190" y1="110" x2="190" y2="150" stroke-width="3" />
+                    <path class="circuit-component" d="M190 120 L230 100" />
+                    <path class="circuit-component" d="M190 140 L230 160" />
+                    <polygon points="228,159 220,150 216,158" fill="#1f2937" stroke="none" />
+                    <text class="circuit-label" x="240" y="125" text-anchor="start">Q1</text>
+                </g>
+                
+                <!-- LED (Replaces Buzzer) -->
+                <path class="circuit-wire-red" d="M230 30 V55" /> 
+                <g id="led-symbol">
+                    <!-- LED Triangle (Diode) pointing down -->
+                    <!-- Center x=230. Triangle top y=55, bottom y=75 -->
+                    <polygon class="circuit-component" points="220,55 240,55 230,75" fill="none" />
+                    <!-- Line at tip -->
+                    <line class="circuit-component" x1="220" y1="75" x2="240" y2="75" />
+                    <!-- Arrows pointing away -->
+                    <g stroke="#1f2937" stroke-width="2" fill="none">
+                        <path d="M245 60 L260 55" marker-end="url(#arrowhead)" />
+                        <path d="M245 70 L260 65" marker-end="url(#arrowhead)" />
+                    </g>
+                    <text class="circuit-label" x="215" y="65" text-anchor="end">LED</text>
+                </g>
+                <path class="circuit-wire-dark" d="M230 75 V100" /> 
+
+                <!-- Labels -->
+                <text class="circuit-label" x="45" y="35" text-anchor="end">5V</text>
+                <text class="circuit-label" x="45" y="225" text-anchor="end">GND</text>
+                
+                <!-- Dynamic V_base Label -->
+                <text class="circuit-label" x="185" y="125" text-anchor="end">V_base:</text>
+                <text id="v-base-text" class="circuit-label-dynamic" x="185" " y="145" text-anchor="end">0.00 V</text>
+            </svg>
+        </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const VCC = 5.0; 
+        const V_ON = 0.7; 
+        const UPDATE_INTERVAL = 100; 
+
+        // --- STATE ---
+        let currentLux = 500;
+        let r_ldr = 0;
+        let r_var = 5000; 
+        let v_base = 0;
+
+        // --- DOM ELEMENTS ---
+        const luxDisplay = document.getElementById('lux-display');
+        const sunBody = document.getElementById('sun-body');
+        const sunRays = document.getElementById('sun-rays');
+        const lightSlider = document.getElementById('light-slider');
+        const lightSliderDisplay = document.getElementById('light-slider-display');
+        
+        const ledStatus = document.getElementById('led-status');
+        const ledVisual = document.getElementById('led-visual');
+        const resistanceDisplay = document.getElementById('resistance-display');
+        const vrSlider = document.getElementById('vr-slider');
+        const vrDisplay = document.getElementById('vr-display');
+        const circuitVrValue = document.getElementById('circuit-vr-value');
+        const vBaseText = document.getElementById('v-base-text');
+        const thresholdDisplay = document.getElementById('threshold-display');
+        
+        // Circuit Animation Elements
+        const currentBasePath = document.getElementById('current-path-base');
+        const currentCollectorPath = document.getElementById('current-path-collector');
+
+        function calculateLDRResistance(lux) {
+            // Inverse relationship fitted to User Requirements:
+            // 0 Lux    -> 2,000,000 Ohms (2 MOhms)
+            // 1000 Lux -> ~5,000 Ohms    (5 kOhms)
+            // Formula: R = 5,000,000 / (lux + 2.5)
+            return 5000000 / (lux + 2.5);
+        }
+
+        function updateSystemState(v_base) {
+            const transistorGroup = document.getElementById('transistor-symbol');
+            const ledGroup = document.getElementById('led-symbol');
+            const isAlarmActive = v_base >= V_ON;
+
+            if (isAlarmActive) {
+                // --- LED ON ---
+                ledVisual.classList.add('on');
+                
+                ledGroup.classList.add('led-active');
+                transistorGroup.classList.add('transistor-active');
+                
+                currentBasePath.classList.remove('hidden');
+                currentCollectorPath.classList.remove('hidden');
+                
+                ledStatus.textContent = 'LED IS ON';
+                ledStatus.classList.remove('text-red-600');
+                ledStatus.classList.add('text-green-600');
+                
+            } else {
+                // --- LED OFF ---
+                ledVisual.classList.remove('on');
+                
+                ledGroup.classList.remove('led-active');
+                transistorGroup.classList.remove('transistor-active');
+                
+                currentBasePath.classList.add('hidden');
+                currentCollectorPath.classList.add('hidden');
+                
+                ledStatus.textContent = 'LED IS OFF';
+                ledStatus.classList.remove('text-green-600');
+                ledStatus.classList.add('text-red-600');
+            }
+        }
+
+        function updateVisuals(lux, r_ldr_val, v_base_val, r_var_val) {
+            // Text Updates
+            luxDisplay.textContent = `${lux} Lux`;
+            lightSliderDisplay.textContent = `${lux} Lux`;
+            
+            // Smart formatting for Resistance (MOhms vs kOhms)
+            let resText;
+            if (r_ldr_val >= 1000000) {
+                resText = (r_ldr_val / 1000000).toFixed(2) + ' M\u2126';
+            } else if (r_ldr_val >= 1000) {
+                resText = (r_ldr_val / 1000).toFixed(1) + ' k\u2126';
+            } else {
+                resText = r_ldr_val.toFixed(0) + ' \u2126';
+            }
+            resistanceDisplay.textContent = resText;
+            
+            vBaseText.textContent = `${v_base_val.toFixed(2)} V`;
+            
+            const vrkOhm = (r_var_val / 1000).toFixed(1);
+            circuitVrValue.textContent = `${vrkOhm} k\u2126`;
+            vrDisplay.textContent = `${vrkOhm} k\u2126`;
+
+            // Sun Visual Intensity
+            const intensity = Math.min(1, lux / 1000);
+            sunBody.style.opacity = 0.2 + (0.8 * intensity); // Min opacity 0.2
+            sunRays.style.opacity = intensity;
+        }
+
+        function simulationLoop() {
+            // 1. Get Inputs
+            currentLux = parseInt(lightSlider.value);
+            r_var = parseInt(vrSlider.value);
+
+            // 2. Physics Calc
+            r_ldr = calculateLDRResistance(currentLux);
+            // Voltage Divider: V_base = VCC * R_VR / (R_LDR + R_VR)
+            v_base = VCC * r_var / (r_ldr + r_var);
+
+            // 3. Update Visuals
+            updateVisuals(currentLux, r_ldr, v_base, r_var);
+            updateSystemState(v_base);
+        }
+
+        // --- INITIALIZATION ---
+        thresholdDisplay.textContent = `Transistor Q1 turns ON when V_base \u2265 ${V_ON}V`;
+        simulationLoop();
+        setInterval(simulationLoop, UPDATE_INTERVAL);
+
+    </script>
+</body>
+</html>
