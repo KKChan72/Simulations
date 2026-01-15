@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voltage Divider Explorer</title>
+    
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Load React and ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Load Babel to process JSX in the browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-slate-50">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // Destructure React hooks from the global React object
+        const { useState, useMemo, useRef, useEffect } = React;
+
+        const VoltageDivider = () => {
+            // State for circuit values
+            const [vin, setVin] = useState(12); // Input voltage (Volts)
+            const [r1, setR1] = useState(1000); // Top resistor (Ohms)
+            const [r2, setR2] = useState(1000); // Bottom/Variable resistor (Ohms)
+
+            // Calculations
+            const vOut = useMemo(() => {
+                const totalR = r1 + r2;
+                if (totalR === 0) return 0;
+                return vin * (r2 / totalR);
+            }, [vin, r1, r2]);
+
+            const current = useMemo(() => {
+                const totalR = r1 + r2;
+                if (totalR === 0) return 0;
+                return vin / totalR;
+            }, [vin, r1, r2]);
+
+            // Format numbers for display
+            const formatOhms = (ohms) => {
+                if (ohms >= 1000) return `${(ohms / 1000).toFixed(1)}kΩ`;
+                return `${Math.round(ohms)}Ω`;
+            };
+
+            // --- JS Animation Logic for Smooth, Spaced Dots ---
+            const pathRef = useRef(null);
+            const dotRefs = useRef([]);
+            const offsetRef = useRef(0);
+            const requestRef = useRef();
+            
+            // Animation Loop
+            useEffect(() => {
+                const path = pathRef.current;
+                if (!path) return;
+                
+                const totalLength = path.getTotalLength();
+                let lastTime = performance.now();
+
+                const animate = (time) => {
+                    const deltaTime = time - lastTime;
+                    lastTime = time;
+
+                    // Speed calculation: pixels per millisecond
+                    // Adjusted to 25 for good visibility
+                    const speed = current * 25; 
+                    
+                    offsetRef.current = (offsetRef.current + speed * deltaTime) % totalLength;
+
+                    dotRefs.current.forEach((dot, index) => {
+                        if (dot) {
+                            const numDots = 48;
+                            const dotOffset = (offsetRef.current + (index / numDots) * totalLength) % totalLength;
+                            
+                            const point = path.getPointAtLength(dotOffset);
+                            dot.setAttribute('cx', point.x);
+                            dot.setAttribute('cy', point.y);
+                        }
+                    });
+
+                    requestRef.current = requestAnimationFrame(animate);
+                };
+
+                requestRef.current = requestAnimationFrame(animate);
+
+                return () => cancelAnimationFrame(requestRef.current);
+            }, [current]);
+
+            const dotIndices = Array.from({ length: 48 }, (_, i) => i);
+
+            return (
+                <div className="flex flex-col items-center justify-center min-h-screen p-2 sm:p-4 font-sans text-slate-800">
+                    <div className="max-w-4xl w-full bg-white rounded-xl shadow-xl overflow-hidden border border-slate-200">
+                        
+                        {/* Header */}
+                        <div className="bg-blue-600 p-4 sm:p-6 text-white">
+                            <h1 className="text-2xl sm:text-3xl font-bold">Voltage Divider Explorer</h1>
+                            <p className="opacity-90 mt-1 sm:mt-2 text-sm sm:text-base">Interactive circuit simulation</p>
+                        </div>
+
+                        <div className="flex justify-center bg-slate-100">
+                            
+                            {/* Left: The Circuit Diagram */}
+                            <div className="w-full p-2 sm:p-8 flex justify-center items-center min-h-[300px] sm:min-h-[400px]">
+                                {/* Extended viewBox to the left (-100) to ensure Vin slider container isn't clipped */}
+                                <svg viewBox="-100 0 600 400" className="w-full max-w-lg drop-shadow-lg select-none">
+                                    <defs>
+                                        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                                            <polygon points="0 0, 10 3.5, 0 7" fill="#334155" />
+                                        </marker>
+                                    </defs>
+
+                                    {/* Hidden Path for Animation Calculation */}
+                                    <path 
+                                        ref={pathRef}
+                                        d="M100,100 L300,100 L300,340 L100,340 Z"
+                                        fill="none"
+                                        stroke="none"
+                                    />
+
+                                    {/* --- Vertical Controls (Embedded HTML) --- */}
+                                    {/* Added touchAction: 'none' to prevent scrolling while sliding on mobile */}
+                                    
+                                    {/* Vin Slider (Left) */}
+                                    <foreignObject x="-65" y="115" width="200" height="240">
+                                        <div className="h-full flex flex-col items-center justify-center pointer-events-auto">
+                                            <input 
+                                                type="range" 
+                                                min="0" max="12" step="0.5"
+                                                value={vin}
+                                                onChange={(e) => setVin(Number(e.target.value))}
+                                                style={{ touchAction: 'none' }}
+                                                className="w-32 h-4 bg-slate-300 rounded-lg appearance-none cursor-pointer accent-slate-700 -rotate-90 shadow-sm border border-black"
+                                            />
+                                            <div className="mt-16 text-center font-bold text-slate-600 text-sm">
+                                                Adjust Vin
+                                            </div>
+                                        </div>
+                                    </foreignObject>
+
+                                    {/* R2 Slider (Middle/Right next to R2) */}
+                                    <foreignObject x="180" y="170" width="140" height="200">
+                                        <div className="h-full flex flex-col items-center justify-center pointer-events-auto">
+                                            <input 
+                                                type="range" 
+                                                min="100" max="10000" step="100"
+                                                value={r2}
+                                                onChange={(e) => setR2(Number(e.target.value))}
+                                                style={{ touchAction: 'none' }}
+                                                className="w-32 h-4 bg-red-100 rounded-lg appearance-none cursor-pointer accent-red-500 -rotate-90 shadow-sm border border-black"
+                                            />
+                                        </div>
+                                    </foreignObject>
+
+
+                                    {/* --- Wires --- */}
+                                    {/* Increased strokeWidth to 5 for better mobile visibility */}
+                                    <line x1="100" y1="100" x2="180" y2="100" stroke="#334155" strokeWidth="5" />
+                                    <polyline 
+                                        points="220,100 300,100 300,130" 
+                                        fill="none" stroke="#334155" strokeWidth="5" 
+                                    />
+                                    
+                                    {/* Ammeter Instrument */}
+                                    <g transform="translate(200, 100)">
+                                        <circle r="20" fill="#f1f5f9" stroke="#334155" strokeWidth="3" />
+                                        <text y="6" textAnchor="middle" className="text-xl font-bold fill-slate-700">A</text>
+                                        <text y="-30" textAnchor="middle" className="text-base font-mono font-bold fill-black">{(current * 1000).toFixed(2)} mA</text>
+                                    </g>
+
+                                    {/* Connection between R1 and R2 */}
+                                    <line x1="300" y1="210" x2="300" y2="230" stroke="#334155" strokeWidth="5" />
+
+                                    {/* Bottom return loop */}
+                                    <polyline 
+                                        points="300,310 300,340 100,340" 
+                                        fill="none" stroke="#334155" strokeWidth="5" 
+                                    />
+
+                                    {/* Battery Connection Vertical */}
+                                    <line x1="100" y1="100" x2="100" y2="180" stroke="#334155" strokeWidth="5" />
+                                    <line x1="100" y1="210" x2="100" y2="340" stroke="#334155" strokeWidth="5" />
+
+
+                                    {/* --- Components --- */}
+                                    
+                                    {/* Battery Symbol */}
+                                    <g transform="translate(100, 200)">
+                                        <line x1="-20" y1="-20" x2="20" y2="-20" stroke="#334155" strokeWidth="5" />
+                                        <line x1="-10" y1="-10" x2="10" y2="-10" stroke="#334155" strokeWidth="5" />
+                                        <line x1="-20" y1="0" x2="20" y2="0" stroke="#334155" strokeWidth="5" />
+                                        <line x1="-10" y1="10" x2="10" y2="10" stroke="#334155" strokeWidth="5" />
+                                        
+                                        <text x="-30" y="5" textAnchor="end" className="text-xl font-bold fill-black">Vin</text>
+                                        <text x="-30" y="25" textAnchor="end" className="text-sm font-bold fill-black">{vin}V</text>
+                                    </g>
+
+                                    {/* Resistor 1 (Fixed) */}
+                                    <g transform="translate(285, 130)">
+                                        <rect x="0" y="0" width="30" height="80" fill="#f8fafc" stroke="#334155" strokeWidth="3" rx="4" />
+                                        <text x="-10" y="45" textAnchor="end" className="text-xl font-bold fill-black">R1</text>
+                                        <text x="-10" y="65" textAnchor="end" className="text-sm font-bold fill-black">{formatOhms(r1)}</text>
+                                    </g>
+
+                                    {/* Resistor 2 (Variable) */}
+                                    <g transform="translate(285, 230)">
+                                        <rect x="0" y="0" width="30" height="80" fill="#f8fafc" stroke="#334155" strokeWidth="3" rx="4" />
+                                        <line x1="-10" y1="80" x2="40" y2="0" stroke="#ef4444" strokeWidth="3" markerEnd="url(#arrowhead)" />
+                                        
+                                        <text x="40" y="45" className="text-xl font-bold fill-black">R2</text>
+                                        <text x="40" y="65" className="text-sm font-bold fill-black">{formatOhms(r2)}</text>
+                                    </g>
+
+                                    {/* Electron Flow Animation */}
+                                    {dotIndices.map((i) => (
+                                        <circle 
+                                            key={i}
+                                            ref={el => dotRefs.current[i] = el}
+                                            r="4" 
+                                            fill="#fbbf24" 
+                                            opacity={vin > 0 ? 1 : 0.5}
+                                        />
+                                    ))}
+
+                                    {/* --- Voltmeter Connection --- */}
+                                    <circle cx="300" cy="220" r="4" fill="#334155" />
+                                    <line x1="300" y1="220" x2="390" y2="220" stroke="#334155" strokeWidth="5" />
+                                    
+                                    <circle cx="300" cy="340" r="4" fill="#334155" />
+                                    <line x1="300" y1="340" x2="390" y2="340" stroke="#334155" strokeWidth="5" />
+
+                                    {/* Voltmeter Instrument */}
+                                    <g transform="translate(390, 280)">
+                                        <line x1="0" y1="-60" x2="0" y2="-25" stroke="#334155" strokeWidth="5" />
+                                        <line x1="0" y1="60" x2="0" y2="25" stroke="#334155" strokeWidth="5" />
+                                        
+                                        <circle cx="0" cy="0" r="28" fill="#f1f5f9" stroke="#334155" strokeWidth="3" />
+                                        <text x="0" y="8" textAnchor="middle" className="text-2xl font-bold fill-slate-700">V</text>
+                                        
+                                        <text x="12" y="-35" className="text-sm font-bold fill-slate-500">+</text>
+                                        <text x="12" y="45" className="text-sm font-bold fill-slate-500">-</text>
+
+                                        {/* Voltmeter Reading Display */}
+                                        <text x="35" y="8" className="text-2xl font-mono font-bold fill-black">{vOut.toFixed(2)}V</text>
+                                    </g>
+
+                                </svg>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<VoltageDivider />);
+    </script>
+</body>
+</html>
